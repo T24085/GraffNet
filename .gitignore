@@ -1,0 +1,10 @@
+# Xcode build artifacts
+build/
+DerivedData/
+
+# Generated Xcode project (created in CI by XcodeGen)
+GraffNet.xcodeproj/
+
+# macOS
+.DS_Store
+
