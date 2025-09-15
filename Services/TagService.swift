@@ -42,5 +42,29 @@ final class TagService {
       up ? "upvotes" : "downvotes": FieldValue.increment(Int64(1))
     ])
   }
-}
 
+  // Realtime listener for tags in a lat band; lng filtered client-side
+  @discardableResult
+  func listenTagsNear(
+    lat: Double,
+    lng: Double,
+    delta: Double = 0.01,
+    limit: Int = 100,
+    onChange: @escaping ([Tag]) -> Void
+  ) -> ListenerRegistration {
+    let query = db.collection("tags")
+      .whereField("lat", isGreaterThan: lat - delta)
+      .whereField("lat", isLessThan:  lat + delta)
+      .limit(to: limit)
+
+    let lowerLng = lng - delta
+    let upperLng = lng + delta
+
+    return query.addSnapshotListener { snapshot, _ in
+      guard let snapshot = snapshot else { onChange([]); return }
+      let docs: [Tag] = snapshot.documents.compactMap { try? $0.data(as: Tag.self) }
+      let filtered = docs.filter { $0.lng >= lowerLng && $0.lng <= upperLng }
+      onChange(filtered)
+    }
+  }
+}

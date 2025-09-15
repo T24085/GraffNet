@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import CoreLocation
+import FirebaseFirestore
 
 struct TagsMapView: View {
   @StateObject private var location = LocationManager()
@@ -10,6 +11,8 @@ struct TagsMapView: View {
   )
   @State private var tags: [Tag] = []
   @State private var status: String = ""
+  @State private var liveUpdates = false
+  @State private var listener: ListenerRegistration?
 
   private let service = TagService()
 
@@ -28,6 +31,7 @@ struct TagsMapView: View {
           region.center = loc.coordinate
         }
       }
+      .onDisappear { stopLive() }
       .frame(minHeight: 350)
 
       HStack {
@@ -38,6 +42,12 @@ struct TagsMapView: View {
         Button("Drop tag here") { createHere() }
       }
       .padding(.horizontal)
+
+      Toggle("Live updates", isOn: $liveUpdates)
+        .padding(.horizontal)
+        .onChange(of: liveUpdates) { _, newValue in
+          newValue ? startLive() : stopLive()
+        }
 
       if !status.isEmpty {
         Text(status).font(.caption).foregroundStyle(.secondary)
@@ -75,9 +85,24 @@ struct TagsMapView: View {
       loadHere()
     } catch { status = "Create failed: \(error.localizedDescription)" }
   }
+
+  private func startLive() {
+    stopLive()
+    let c = region.center
+    listener = service.listenTagsNear(lat: c.latitude, lng: c.longitude, delta: 0.03) { items in
+      DispatchQueue.main.async {
+        self.tags = items
+        self.status = "Live: \(items.count) tags"
+      }
+    }
+  }
+
+  private func stopLive() {
+    listener?.remove()
+    listener = nil
+  }
 }
 
 #Preview {
   NavigationView { TagsMapView() }
 }
-
