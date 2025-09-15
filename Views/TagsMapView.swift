@@ -113,7 +113,12 @@ struct TagsMapView: View {
         if liveUpdates { startLive() } else { loadHere() }
       }
       .onDisappear { stopLive() }
-      .onChange(of: (region.center.latitude, region.center.longitude)) { _ in
+      .onChange(of: region.center.latitude) { _ in
+        // Debounce region changes to avoid spamming Firestore
+        scheduleRegionChanged()
+        persistRegion()
+      }
+      .onChange(of: region.center.longitude) { _ in
         // Debounce region changes to avoid spamming Firestore
         scheduleRegionChanged()
         persistRegion()
@@ -178,7 +183,7 @@ struct TagsMapView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-          HStack { .padding(.horizontal)
+          HStack {
             Button("Cancel", role: .cancel) {
               showCreateSheet = false
               newTagText = ""
@@ -188,6 +193,7 @@ struct TagsMapView: View {
               .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
               .disabled(!canCreateNow)
           }
+          .padding(.horizontal)
           if !canCreateNow {
             Text("Please wait a few seconds between creations")
               .font(.caption2)
