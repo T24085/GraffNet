@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthed() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isAllowedType(t) {
+      return t in ['text', 'strokes', 'external'];
+    }
+
+    function validLatLng(lat, lng) {
+      return lat is number && lng is number && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+    }
+
+    function safeString(s, maxLen) {
+      return s == null || (s is string && s.size() > 0 && s.size() <= maxLen);
+    }
+
+    function nonNegativeInt(n) {
+      return n is int && n >= 0;
+    }
+
+    function validateCreate(data) {
+      // Required fields
+      return data.keys().hasAll(['authorId','lat','lng','type','upvotes','downvotes','createdAt'])
+        && data.authorId == request.auth.uid
+        && validLatLng(data.lat, data.lng)
+        && isAllowedType(data.type)
+        && safeString(data.text, 240)
+        && nonNegativeInt(data.upvotes) && nonNegativeInt(data.downvotes)
+        // createdAt must be close to server time (client clock skew allowed)
+        && data.createdAt is timestamp
+        && data.createdAt <= request.time
+        && data.createdAt >= request.time - duration.value(10, 'm')
+        // Optional fields must have correct types if present
+        && (!('strokes' in data) || data.strokes is list)
+        && (!('thumb' in data) || data.thumb is bytes)
+        && (!('assetUrl' in data) || data.assetUrl is string);
+    }
+
+    function isVoteIncrement() {
+      // Only allow +1 to either upvotes or downvotes; nothing else may change
+      return (
+        request.resource.data.authorId == resource.data.authorId &&
+        request.resource.data.lat == resource.data.lat &&
+        request.resource.data.lng == resource.data.lng &&
+        request.resource.data.type == resource.data.type &&
+        request.resource.data.text == resource.data.text &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (!('strokes' in request.resource.data) == !('strokes' in resource.data)) &&
+        (!('thumb' in request.resource.data) == !('thumb' in resource.data)) &&
+        (!('assetUrl' in request.resource.data) == !('assetUrl' in resource.data)) &&
+        (
+          (request.resource.data.upvotes == resource.data.upvotes + 1 &&
+           request.resource.data.downvotes == resource.data.downvotes) ||
+          (request.resource.data.downvotes == resource.data.downvotes + 1 &&
+           request.resource.data.upvotes == resource.data.upvotes)
+        )
+      );
+    }
+
+    match /tags/{tagId} {
+      allow read: if true; // Public reads
+
+      allow create: if isAuthed() && validateCreate(request.resource.data);
+
+      // Only author can delete their own document
+      allow delete: if isAuthed() && request.auth.uid == resource.data.authorId;
+
+      // No broad updates allowed for now; only allow vote increments
+      allow update: if isVoteIncrement();
+    }
+  }
+}
+
