@@ -85,16 +85,16 @@ struct TagsMapView: View {
         )
           // Inline callout over the selected tag
           .overlay(alignment: .topLeading) {
-            if let t = selectedTag {
-              let p = proxy.convert(CLLocationCoordinate2D(latitude: t.lat, longitude: t.lng), to: .local)
-            TagCallout(
-              tag: t,
-              isOwner: t.authorId == (Auth.auth().currentUser?.uid ?? ""),
-              onUpvote: { vote(tag: t, up: true) },
-              onDownvote: { vote(tag: t, up: false) },
-              onDelete: { delete(tag: t) },
-              onClose: { selectedTag = nil }
-            )
+            if let t = selectedTag,
+               let p = proxy.convert(CLLocationCoordinate2D(latitude: t.lat, longitude: t.lng), to: .local) {
+              TagCallout(
+                tag: t,
+                isOwner: t.authorId == (Auth.auth().currentUser?.uid ?? ""),
+                onUpvote: { vote(tag: t, up: true) },
+                onDownvote: { vote(tag: t, up: false) },
+                onDelete: { delete(tag: t) },
+                onClose: { selectedTag = nil }
+              )
               .position(p)
               .offset(y: -28)
             }
@@ -178,7 +178,7 @@ struct TagsMapView: View {
           .font(.caption)
           .foregroundStyle(.secondary)
       }
-          HStack {
+          HStack { .padding(.horizontal)
             Button("Cancel", role: .cancel) {
               showCreateSheet = false
               newTagText = ""
@@ -193,7 +193,6 @@ struct TagsMapView: View {
               .font(.caption2)
               .foregroundStyle(.secondary)
           }
-          .padding(.horizontal)
           Spacer()
         }
         .padding(.top)
@@ -478,3 +477,6 @@ private struct TagCallout: View {
 #Preview {
   NavigationView { TagsMapView() }
 }
+
+
+
