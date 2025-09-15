@@ -189,10 +189,16 @@ struct TagsMapView: View {
         .shadow(radius: 2)
       }
 
-      HStack {
-        Button("Load tags here") { loadHere() }
+      HStack(spacing: 16) {
+        Button(action: { loadHere() }) {
+          RoundedImageButton(name: "LoadTagsHere1", height: 44)
+            .accessibilityLabel("Load tags here")
+        }
         Spacer()
-        Button("Drop tag here") { pendingCoordinate = nil; showCreateSheet = true }
+        Button(action: { pendingCoordinate = nil; showCreateSheet = true }) {
+          RoundedImageButton(name: "DropTagsHere1", height: 44)
+            .accessibilityLabel("Drop tag here")
+        }
       }
       .padding(.horizontal)
 
@@ -554,9 +560,28 @@ private struct TagCallout: View {
   }
 }
 
-#Preview {
+
+// Rounded image button used in the HStack
+private struct RoundedImageButton: View {
+  let name: String
+  var height: CGFloat = 44
+
+  var body: some View {
+    Image(name)
+      .resizable()
+      .scaledToFit()
+      .frame(height: height)
+      .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: 10, style: .continuous)
+          .stroke(Color.white.opacity(0.2), lineWidth: 1)
+      )
+      .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+  }
+}#Preview {
   NavigationView { TagsMapView() }
 }
+
 
 
 
