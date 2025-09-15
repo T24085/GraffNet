@@ -196,7 +196,7 @@ struct TagsMapView: View {
         }
         Spacer()
         Button(action: { pendingCoordinate = nil; showCreateSheet = true }) {
-          RoundedImageButton(name: "DropTagsHere1", height: 44)
+          RoundedImageButton(name: "DropTagHere1", height: 44)
             .accessibilityLabel("Drop tag here")
         }
       }

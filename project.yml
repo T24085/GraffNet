@@ -17,6 +17,8 @@ targets:
       - path: Models
       - path: Services
       - path: GoogleService-Info.plist
+    resources:
+      - path: AppImages
     info:
       path: Info.plist
     settings:
