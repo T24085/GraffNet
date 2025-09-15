@@ -13,6 +13,7 @@ targets:
     sources:
       - path: App.swift
       - path: ContentView.swift
+      - path: Views
       - path: Models
       - path: Services
       - path: GoogleService-Info.plist

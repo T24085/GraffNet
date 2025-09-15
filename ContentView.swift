@@ -32,6 +32,8 @@ struct ContentView: View {
         Button("Create at my location") { createAtMyLocation() }
       }
 
+      NavigationLink("Open map", destination: TagsMapView())
+
       if !status.isEmpty { Text(status).font(.caption).foregroundStyle(.secondary) }
 
       List(tags) { tag in
