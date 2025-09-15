@@ -11,18 +11,13 @@ targets:
     platform: iOS
     deploymentTarget: "15.0"
     sources:
-      - path: .
-        excludes:
-          - .github
-          - project.yml
-          - README.md
+      - path: App.swift
+      - path: ContentView.swift
+      - path: Models
+      - path: Services
+      - path: GoogleService-Info.plist
     info:
-      properties:
-        UILaunchScreen: {}
-        UISupportedInterfaceOrientations:
-          - UIInterfaceOrientationPortrait
-        UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: false
+      path: Info.plist
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.fluxcode.streetgraf
     dependencies:
@@ -32,4 +27,3 @@ targets:
         product: FirebaseFirestore
       - package: Firebase
         product: FirebaseFirestoreSwift
-
