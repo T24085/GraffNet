@@ -34,7 +34,8 @@ struct TagsMapView: View {
 
   var body: some View {
     VStack(spacing: 8) {
-      if #available(iOS 17.0, *) {
+      Group {
+        if #available(iOS 17.0, *) {
         MapReader { proxy in
           Map(
             coordinateRegion: $region,
@@ -100,7 +101,7 @@ struct TagsMapView: View {
             }
           }
         }
-      } else {
+        } else {
         Map(
           coordinateRegion: $region,
           showsUserLocation: true,
@@ -139,6 +140,7 @@ struct TagsMapView: View {
           LongPressGesture(minimumDuration: 0.5)
             .onEnded { _ in pendingCoordinate = nil; showCreateSheet = true }
         )
+        }
       }
       .onAppear {
         // Start location and live updates immediately
@@ -459,7 +461,16 @@ struct TagsMapView: View {
     if base > 0.02 { return 120 }
     return 160
   }
+
+  private var dialogTitle: String {
+    if let t = selectedTag {
+      if let txt = t.text, !txt.isEmpty { return txt }
+      return String(format: "(%.4f, %.4f)", t.lat, t.lng)
+    }
+    return "Tag actions"
+  }
 }
+
 
 // Conditionally apply presentationDetents on iOS 16+
 private extension View {
