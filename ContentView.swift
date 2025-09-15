@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct ContentView: View {
   @State private var text: String = "Hello, StreetGraf!"
@@ -8,6 +9,7 @@ struct ContentView: View {
   @State private var tags: [Tag] = []
 
   private let service = TagService()
+  @StateObject private var location = LocationManager()
 
   var body: some View {
     VStack(spacing: 16) {
@@ -25,14 +27,26 @@ struct ContentView: View {
         Button("Load nearby") { load() }
       }
 
+      HStack {
+        Button("Use my location") { useMyLocation() }
+        Button("Create at my location") { createAtMyLocation() }
+      }
+
       if !status.isEmpty { Text(status).font(.caption).foregroundStyle(.secondary) }
 
       List(tags) { tag in
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
           Text(tag.text ?? "(no text)")
-          Text(String(format: "(%.4f, %.4f)", tag.lat, tag.lng))
-            .font(.caption)
-            .foregroundStyle(.secondary)
+          HStack(spacing: 12) {
+            Text(String(format: "(%.4f, %.4f)", tag.lat, tag.lng))
+              .font(.caption)
+              .foregroundStyle(.secondary)
+            Spacer()
+            Button("👍 \(tag.upvotes)") { vote(tag: tag, up: true) }
+              .buttonStyle(.borderless)
+            Button("👎 \(tag.downvotes)") { vote(tag: tag, up: false) }
+              .buttonStyle(.borderless)
+          }
         }
       }
     }
@@ -64,9 +78,45 @@ struct ContentView: View {
       }
     }
   }
+
+  private func useMyLocation() {
+    // Request permission and update fields when a location arrives
+    location.requestWhenInUse()
+    if let loc = location.lastLocation {
+      lat = String(format: "%.6f", loc.coordinate.latitude)
+      lng = String(format: "%.6f", loc.coordinate.longitude)
+    } else {
+      status = "Requesting location…"
+      // Poll once after a short delay to copy coordinates into fields
+      DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+        if let loc = location.lastLocation {
+          lat = String(format: "%.6f", loc.coordinate.latitude)
+          lng = String(format: "%.6f", loc.coordinate.longitude)
+          status = "Got location"
+        }
+      }
+    }
+  }
+
+  private func createAtMyLocation() {
+    if let loc = location.lastLocation {
+      do {
+        try service.createTextTag(lat: loc.coordinate.latitude, lng: loc.coordinate.longitude, text: text)
+        status = "Created at my location!"
+      } catch { status = "Create failed: \(error.localizedDescription)" }
+    } else {
+      status = "No location yet; tap 'Use my location'"
+    }
+  }
+
+  private func vote(tag: Tag, up: Bool) {
+    guard let id = tag.id else { return }
+    Task { try? await service.vote(tagId: id, up: up); await loadAfterVote() }
+  }
+
+  @MainActor private func loadAfterVote() async { load() }
 }
 
 #Preview {
   NavigationView { ContentView() }
 }
-

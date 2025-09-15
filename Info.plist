@@ -31,6 +31,7 @@
     <key>UIApplicationSupportsMultipleScenes</key>
     <false/>
   </dict>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Needed to place and view nearby graffiti.</string>
 </dict>
 </plist>
-
