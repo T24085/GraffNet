@@ -45,7 +45,7 @@ struct TagsMapView: View {
 
       Toggle("Live updates", isOn: $liveUpdates)
         .padding(.horizontal)
-        .onChange(of: liveUpdates) { _, newValue in
+        .onChange(of: liveUpdates) { newValue in
           newValue ? startLive() : stopLive()
         }
 
