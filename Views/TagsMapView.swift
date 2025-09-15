@@ -28,61 +28,61 @@ struct TagsMapView: View {
   @State private var pendingCoordinate: CLLocationCoordinate2D?
   @State private var lastTouchPoint: CGPoint?
   @State private var lastCreateAt: Date?
+  @State private var showActionsDialog = false
 
   private let service = TagService()
 
   var body: some View {
     VStack(spacing: 8) {
-      MapReader { proxy in
-        Map(
-          coordinateRegion: $region,
-          showsUserLocation: true,
-          userTrackingMode: $tracking,
-          annotationItems: displayItems
-        ) { tag in
-          MapAnnotation(
-            coordinate: tag.coordinate
-          ) {
-            if let inner = tag.tag { // real tag
-              Button { selectedTag = inner } label: {
-                Image(systemName: "mappin.circle.fill")
-                  .font(.title2)
-                  .foregroundColor(.blue)
-                  .shadow(radius: 2)
-              }
-              .buttonStyle(.plain)
-            } else {
-              // cluster
-              Button { zoomIn(on: tag.coordinate) } label: {
-                ZStack {
-                  Circle().fill(Color.orange.opacity(0.9))
-                    .frame(width: 30, height: 30)
-                  Text("\(tag.count)")
-                    .font(.footnote).bold()
-                    .foregroundColor(.white)
+      if #available(iOS 17.0, *) {
+        MapReader { proxy in
+          Map(
+            coordinateRegion: $region,
+            showsUserLocation: true,
+            userTrackingMode: $tracking,
+            annotationItems: displayItems
+          ) { tag in
+            MapAnnotation(
+              coordinate: tag.coordinate
+            ) {
+              if let inner = tag.tag { // real tag
+                Button { selectedTag = inner } label: {
+                  Image(systemName: "mappin.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+                    .shadow(radius: 2)
                 }
-                .shadow(radius: 2)
+                .buttonStyle(.plain)
+              } else {
+                // cluster
+                Button { zoomIn(on: tag.coordinate) } label: {
+                  ZStack {
+                    Circle().fill(Color.orange.opacity(0.9))
+                      .frame(width: 30, height: 30)
+                    Text("\(tag.count)")
+                      .font(.footnote).bold()
+                      .foregroundColor(.white)
+                  }
+                  .shadow(radius: 2)
+                }
+                .buttonStyle(.plain)
               }
-              .buttonStyle(.plain)
             }
           }
-        }
-        // Capture touch location continuously so we know where the long press occurred
-        .simultaneousGesture(
-          DragGesture(minimumDistance: 0)
-            .onChanged { value in lastTouchPoint = value.location }
-        )
-        // Long press to start creating a tag at the press location
-        .simultaneousGesture(
-          LongPressGesture(minimumDuration: 0.5)
-            .onEnded { _ in
-              if let p = lastTouchPoint {
-                let coord = proxy.convert(p, from: .local)
-                pendingCoordinate = coord
-                showCreateSheet = true
+          // Capture touch location to create at press location
+          .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+              .onChanged { value in lastTouchPoint = value.location }
+          )
+          .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.5)
+              .onEnded { _ in
+                if let p = lastTouchPoint, let coord = proxy.convert(p, from: .local) {
+                  pendingCoordinate = coord
+                  showCreateSheet = true
+                }
               }
-            }
-        )
+          )
           // Inline callout over the selected tag
           .overlay(alignment: .topLeading) {
             if let t = selectedTag,
@@ -99,6 +99,46 @@ struct TagsMapView: View {
               .offset(y: -28)
             }
           }
+        }
+      } else {
+        Map(
+          coordinateRegion: $region,
+          showsUserLocation: true,
+          userTrackingMode: $tracking,
+          annotationItems: displayItems
+        ) { tag in
+          MapAnnotation(coordinate: tag.coordinate) {
+            if let inner = tag.tag {
+              Button {
+                selectedTag = inner
+                showActionsDialog = true
+              } label: {
+                Image(systemName: "mappin.circle.fill")
+                  .font(.title2)
+                  .foregroundColor(.blue)
+                  .shadow(radius: 2)
+              }
+              .buttonStyle(.plain)
+            } else {
+              Button { zoomIn(on: tag.coordinate) } label: {
+                ZStack {
+                  Circle().fill(Color.orange.opacity(0.9))
+                    .frame(width: 30, height: 30)
+                  Text("\(tag.count)")
+                    .font(.footnote).bold()
+                    .foregroundColor(.white)
+                }
+                .shadow(radius: 2)
+              }
+              .buttonStyle(.plain)
+            }
+          }
+        }
+        // Long press fallback: open sheet to create at map center
+        .simultaneousGesture(
+          LongPressGesture(minimumDuration: 0.5)
+            .onEnded { _ in pendingCoordinate = nil; showCreateSheet = true }
+        )
       }
       .onAppear {
         // Start location and live updates immediately
@@ -205,7 +245,18 @@ struct TagsMapView: View {
         .navigationTitle("New Tag")
         .navigationBarTitleDisplayMode(.inline)
       }
-      .presentationDetents([.medium])
+      .maybePresentationDetentsMedium()
+    }
+    // Fallback actions dialog for iOS 15/16
+    .confirmationDialog(dialogTitle, isPresented: $showActionsDialog) {
+      if let tag = selectedTag {
+        Button("Upvote") { vote(tag: tag, up: true) }
+        Button("Downvote") { vote(tag: tag, up: false) }
+        if tag.authorId == (Auth.auth().currentUser?.uid ?? "") {
+          Button("Delete", role: .destructive) { delete(tag: tag) }
+        }
+        Button("Cancel", role: .cancel) { }
+      }
     }
   }
 
@@ -407,6 +458,18 @@ struct TagsMapView: View {
     if base > 0.05 { return 90 }
     if base > 0.02 { return 120 }
     return 160
+  }
+}
+
+// Conditionally apply presentationDetents on iOS 16+
+private extension View {
+  @ViewBuilder
+  func maybePresentationDetentsMedium() -> some View {
+    if #available(iOS 16.0, *) {
+      self.presentationDetents([.medium])
+    } else {
+      self
+    }
   }
 }
 
