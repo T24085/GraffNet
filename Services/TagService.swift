@@ -43,6 +43,10 @@ final class TagService {
     ])
   }
 
+  func delete(tagId: String) async throws {
+    try await db.collection("tags").document(tagId).delete()
+  }
+
   // Realtime listener for tags in a lat band; lng filtered client-side
   @discardableResult
   func listenTagsNear(
