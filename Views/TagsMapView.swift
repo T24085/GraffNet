@@ -578,7 +578,9 @@ private struct RoundedImageButton: View {
       )
       .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
   }
-}#Preview {
+}
+
+#Preview {
   NavigationView { TagsMapView() }
 }
 
