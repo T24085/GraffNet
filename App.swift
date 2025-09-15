@@ -26,8 +26,7 @@ struct GraffNetApp: App {
 
   var body: some Scene {
     WindowGroup {
-      NavigationView { ContentView() }
+      NavigationView { TagsMapView() }
     }
   }
 }
-

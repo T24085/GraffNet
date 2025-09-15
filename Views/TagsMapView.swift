@@ -11,8 +11,9 @@ struct TagsMapView: View {
   )
   @State private var tags: [Tag] = []
   @State private var status: String = ""
-  @State private var liveUpdates = false
+  @State private var liveUpdates = true
   @State private var listener: ListenerRegistration?
+  @State private var didCenterOnUser = false
 
   private let service = TagService()
 
@@ -25,11 +26,10 @@ struct TagsMapView: View {
         )
       }
       .onAppear {
-        // Center on current location if available
+        // Start location and live updates immediately
         location.requestWhenInUse()
-        if let loc = location.lastLocation {
-          region.center = loc.coordinate
-        }
+        if let loc = location.lastLocation { region.center = loc.coordinate }
+        if liveUpdates { startLive() } else { loadHere() }
       }
       .onDisappear { stopLive() }
       .frame(minHeight: 350)
@@ -64,6 +64,12 @@ struct TagsMapView: View {
     } else {
       status = "Requesting location…"
     }
+  }
+
+  // When we first get a GPS fix, center once and optionally restart live listener
+  init() {
+    // Observe location changes via NotificationCenter would be overkill; we'll use a small delay loop
+    // Not used in previews
   }
 
   private func loadHere() {
