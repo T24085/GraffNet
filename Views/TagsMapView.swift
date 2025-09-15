@@ -113,7 +113,7 @@ struct TagsMapView: View {
         if liveUpdates { startLive() } else { loadHere() }
       }
       .onDisappear { stopLive() }
-      .onChange(of: region.center) { _ in
+      .onChange(of: (region.center.latitude, region.center.longitude)) { _ in
         // Debounce region changes to avoid spamming Firestore
         scheduleRegionChanged()
         persistRegion()
@@ -286,7 +286,7 @@ struct TagsMapView: View {
   // MARK: - Region change handling
   private func scheduleRegionChanged() {
     debounceWorkItem?.cancel()
-    let item = DispatchWorkItem { [weak _ = self] in
+    let item = DispatchWorkItem {
       handleRegionChanged()
     }
     debounceWorkItem = item
