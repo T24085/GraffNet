@@ -38,3 +38,26 @@ jobs:
         with:
           name: GraffNet-Simulator-App
           path: build/Build/Products/Debug-iphonesimulator/GraffNet.app
+
+      - name: Boot simulator, install app, take screenshot
+        run: |
+          DEVICE_NAME="GraffNetCI-iPhone"
+          RUNTIME=$(xcrun simctl list runtimes | grep -o 'iOS .* (.*)' | tail -n 1 | sed -E 's/.*\((.*)\)/\1/')
+          DEVICE_ID=$(xcrun simctl create "$DEVICE_NAME" "iPhone 15" "$RUNTIME")
+          echo "Created device $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID"
+          xcrun simctl bootstatus "$DEVICE_ID" -b
+          APP_PATH="build/Build/Products/Debug-iphonesimulator/GraffNet.app"
+          xcrun simctl install "$DEVICE_ID" "$APP_PATH"
+          xcrun simctl launch "$DEVICE_ID" com.fluxcode.streetgraf || true
+          # Give it a moment to render first screen
+          sleep 5
+          mkdir -p ci_screens
+          xcrun simctl io "$DEVICE_ID" screenshot ci_screens/launch.png
+          xcrun simctl shutdown "$DEVICE_ID"
+
+      - name: Upload launch screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: GraffNet-Launch-Screenshot
+          path: ci_screens/launch.png
