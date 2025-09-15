@@ -41,11 +41,11 @@ jobs:
 
       - name: Boot simulator, install app, take screenshot
         run: |
-          DEVICE_NAME="GraffNetCI-iPhone"
-          RUNTIME=$(xcrun simctl list runtimes | grep -o 'iOS .* (.*)' | tail -n 1 | sed -E 's/.*\((.*)\)/\1/')
-          DEVICE_ID=$(xcrun simctl create "$DEVICE_NAME" "iPhone 15" "$RUNTIME")
-          echo "Created device $DEVICE_ID"
-          xcrun simctl boot "$DEVICE_ID"
+          # Use an already available simulator to avoid runtime identifier issues
+          DEVICE_ID=$(xcrun simctl list devices available | sed -n 's/.*(\([0-9A-Fa-f-]\{36\}\)).*/\1/p' | head -n 1)
+          echo "Using simulator: $DEVICE_ID"
+          # Boot if not already booted and wait until ready
+          xcrun simctl boot "$DEVICE_ID" || true
           xcrun simctl bootstatus "$DEVICE_ID" -b
           APP_PATH="build/Build/Products/Debug-iphonesimulator/GraffNet.app"
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
@@ -54,7 +54,7 @@ jobs:
           sleep 5
           mkdir -p ci_screens
           xcrun simctl io "$DEVICE_ID" screenshot ci_screens/launch.png
-          xcrun simctl shutdown "$DEVICE_ID"
+          xcrun simctl shutdown "$DEVICE_ID" || true
 
       - name: Upload launch screenshot
         uses: actions/upload-artifact@v4
