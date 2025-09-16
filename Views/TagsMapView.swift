@@ -29,6 +29,7 @@ struct TagsMapView: View {
   @State private var lastTouchPoint: CGPoint?
   @State private var lastCreateAt: Date?
   @State private var showActionsDialog = false
+  @State private var showGraffitiCanvas = false
 
   private let service = TagService()
 
@@ -213,6 +214,16 @@ struct TagsMapView: View {
       }
     }
     .navigationTitle("Map")
+    .toolbar {
+      ToolbarItem(placement: .navigationBarTrailing) {
+        if ARGraffitiView.isSupported {
+          Button(action: { showGraffitiCanvas = true }) {
+            Image(systemName: "camera.viewfinder")
+          }
+          .accessibilityLabel("Open AR painter")
+        }
+      }
+    }
     .padding(.bottom)
     .sheet(isPresented: $showCreateSheet) {
       NavigationView {
@@ -254,6 +265,9 @@ struct TagsMapView: View {
         .navigationBarTitleDisplayMode(.inline)
       }
       .maybePresentationDetentsMedium()
+    }
+    .fullScreenCover(isPresented: $showGraffitiCanvas) {
+      ARGraffitiView()
     }
     // Fallback actions dialog for iOS 15/16
     .confirmationDialog(dialogTitle, isPresented: $showActionsDialog) {

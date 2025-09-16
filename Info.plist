@@ -33,5 +33,7 @@
   </dict>
   <key>NSLocationWhenInUseUsageDescription</key>
   <string>Needed to place and view nearby graffiti.</string>
+  <key>NSCameraUsageDescription</key>
+  <string>The camera is used to paint graffiti in augmented reality.</string>
 </dict>
 </plist>
