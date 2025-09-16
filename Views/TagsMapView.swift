@@ -26,169 +26,136 @@ struct TagsMapView: View {
   @State private var showCreateSheet = false
   @State private var newTagText: String = ""
   @State private var pendingCoordinate: CLLocationCoordinate2D?
-  @State private var lastTouchPoint: CGPoint?
   @State private var lastCreateAt: Date?
   @State private var showActionsDialog = false
   @State private var showGraffitiCanvas = false
 
   private let service = TagService()
+  private var currentUserID: String { Auth.auth().currentUser?.uid ?? "" }
+
+  @ViewBuilder
+  private var mapContent: some View {
+#if swift(>=5.9)
+    if #available(iOS 17.0, *) {
+      TagsMapReaderView(
+        region: $region,
+        tracking: $tracking,
+        displayItems: displayItems,
+        selectedTag: $selectedTag,
+        pendingCoordinate: $pendingCoordinate,
+        showCreateSheet: $showCreateSheet,
+        currentUserID: currentUserID,
+        onZoomIn: { zoomIn(on: $0) },
+        onUpvote: { vote(tag: $0, up: true) },
+        onDownvote: { vote(tag: $0, up: false) },
+        onDelete: { delete(tag: $0) }
+      )
+    } else {
+      legacyMapContent
+    }
+#else
+    legacyMapContent
+#endif
+  }
+
+  private var legacyMapContent: some View {
+    Map(
+      coordinateRegion: $region,
+      showsUserLocation: true,
+      userTrackingMode: $tracking,
+      annotationItems: displayItems
+    ) { tag in
+      MapAnnotation(coordinate: tag.coordinate) {
+        if let inner = tag.tag {
+          Button {
+            selectedTag = inner
+            showActionsDialog = true
+          } label: {
+            Image(systemName: "mappin.circle.fill")
+              .font(.title2)
+              .foregroundColor(.blue)
+              .shadow(radius: 2)
+          }
+          .buttonStyle(.plain)
+        } else {
+          Button { zoomIn(on: tag.coordinate) } label: {
+            ZStack {
+              Circle().fill(Color.orange.opacity(0.9))
+                .frame(width: 30, height: 30)
+              Text("\(tag.count)")
+                .font(.footnote).bold()
+                .foregroundColor(.white)
+            }
+            .shadow(radius: 2)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+    // Long press fallback: open sheet to create at map center
+    .simultaneousGesture(
+      LongPressGesture(minimumDuration: 0.5)
+        .onEnded { _ in pendingCoordinate = nil; showCreateSheet = true }
+    )
+  }
 
   var body: some View {
     VStack(spacing: 8) {
-      Group {
-        if #available(iOS 17.0, *) {
-        MapReader { proxy in
-          Map(
-            coordinateRegion: $region,
-            showsUserLocation: true,
-            userTrackingMode: $tracking,
-            annotationItems: displayItems
-          ) { tag in
-            MapAnnotation(
-              coordinate: tag.coordinate
-            ) {
-              if let inner = tag.tag { // real tag
-                Button { selectedTag = inner } label: {
-                  Image(systemName: "mappin.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-                    .shadow(radius: 2)
-                }
-                .buttonStyle(.plain)
-              } else {
-                // cluster
-                Button { zoomIn(on: tag.coordinate) } label: {
-                  ZStack {
-                    Circle().fill(Color.orange.opacity(0.9))
-                      .frame(width: 30, height: 30)
-                    Text("\(tag.count)")
-                      .font(.footnote).bold()
-                      .foregroundColor(.white)
-                  }
-                  .shadow(radius: 2)
-                }
-                .buttonStyle(.plain)
-              }
-            }
+      mapContent
+        .onAppear {
+          // Start location and live updates immediately
+          location.requestWhenInUse()
+          // Restore last viewed region
+          region.center = CLLocationCoordinate2D(latitude: storedCenterLat, longitude: storedCenterLng)
+          region.span = MKCoordinateSpan(latitudeDelta: storedSpanLat, longitudeDelta: storedSpanLng)
+          if let loc = location.lastLocation, !didCenterOnUser {
+            // If GPS is ready at launch, prefer centering on user once
+            region.center = loc.coordinate
           }
-          // Capture touch location to create at press location
-          .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-              .onChanged { value in lastTouchPoint = value.location }
-          )
-          .simultaneousGesture(
-            LongPressGesture(minimumDuration: 0.5)
-              .onEnded { _ in
-                if let p = lastTouchPoint, let coord = proxy.convert(p, from: .local) {
-                  pendingCoordinate = coord
-                  showCreateSheet = true
-                }
-              }
-          )
-          // Inline callout over the selected tag
-          .overlay(alignment: .topLeading) {
-            if let t = selectedTag,
-               let p = proxy.convert(CLLocationCoordinate2D(latitude: t.lat, longitude: t.lng), to: .local) {
-              TagCallout(
-                tag: t,
-                isOwner: t.authorId == (Auth.auth().currentUser?.uid ?? ""),
-                onUpvote: { vote(tag: t, up: true) },
-                onDownvote: { vote(tag: t, up: false) },
-                onDelete: { delete(tag: t) },
-                onClose: { selectedTag = nil }
-              )
-              .position(p)
-              .offset(y: -28)
-            }
+          if liveUpdates {
+            startLive()
+          } else {
+            loadHere()
           }
         }
-        } else {
-        Map(
-          coordinateRegion: $region,
-          showsUserLocation: true,
-          userTrackingMode: $tracking,
-          annotationItems: displayItems
-        ) { tag in
-          MapAnnotation(coordinate: tag.coordinate) {
-            if let inner = tag.tag {
-              Button {
-                selectedTag = inner
-                showActionsDialog = true
-              } label: {
-                Image(systemName: "mappin.circle.fill")
-                  .font(.title2)
-                  .foregroundColor(.blue)
-                  .shadow(radius: 2)
-              }
-              .buttonStyle(.plain)
-            } else {
-              Button { zoomIn(on: tag.coordinate) } label: {
-                ZStack {
-                  Circle().fill(Color.orange.opacity(0.9))
-                    .frame(width: 30, height: 30)
-                  Text("\(tag.count)")
-                    .font(.footnote).bold()
-                    .foregroundColor(.white)
-                }
-                .shadow(radius: 2)
-              }
-              .buttonStyle(.plain)
-            }
+        .onDisappear { stopLive() }
+        .onChange(of: region.center.latitude) { _ in
+          // Debounce region changes to avoid spamming Firestore
+          scheduleRegionChanged()
+          persistRegion()
+        }
+        .onChange(of: region.center.longitude) { _ in
+          // Debounce region changes to avoid spamming Firestore
+          scheduleRegionChanged()
+          persistRegion()
+        }
+        .onChange(of: region.span.latitudeDelta) { _ in persistRegion() }
+        .onChange(of: region.span.longitudeDelta) { _ in persistRegion() }
+        .onChange(of: location.lastLocation) { loc in
+          // Auto-center once when we first receive a GPS fix
+          guard !didCenterOnUser, let loc = loc else { return }
+          withAnimation { region.center = loc.coordinate }
+          didCenterOnUser = true
+          // Refresh data for the new center
+          if liveUpdates {
+            startLive()
+          } else {
+            loadHere()
           }
         }
-        // Long press fallback: open sheet to create at map center
-        .simultaneousGesture(
-          LongPressGesture(minimumDuration: 0.5)
-            .onEnded { _ in pendingCoordinate = nil; showCreateSheet = true }
-        )
+        .frame(minHeight: 350)
+        .overlay(alignment: .topTrailing) {
+          Button(action: { centerOnMe() }) {
+            Image(systemName: "location.fill")
+              .font(.system(size: 16, weight: .semibold))
+              .foregroundColor(.blue)
+              .padding(10)
+              .background(.ultraThinMaterial, in: Circle())
+          }
+          .padding(.trailing, 12)
+          .padding(.top, 12)
+          .shadow(radius: 2)
         }
-      }
-      .onAppear {
-        // Start location and live updates immediately
-        location.requestWhenInUse()
-        // Restore last viewed region
-        region.center = CLLocationCoordinate2D(latitude: storedCenterLat, longitude: storedCenterLng)
-        region.span = MKCoordinateSpan(latitudeDelta: storedSpanLat, longitudeDelta: storedSpanLng)
-        if let loc = location.lastLocation, !didCenterOnUser {
-          // If GPS is ready at launch, prefer centering on user once
-          region.center = loc.coordinate
-        }
-        if liveUpdates { startLive() } else { loadHere() }
-      }
-      .onDisappear { stopLive() }
-      .onChange(of: region.center.latitude) { _ in
-        // Debounce region changes to avoid spamming Firestore
-        scheduleRegionChanged()
-        persistRegion()
-      }
-      .onChange(of: region.center.longitude) { _ in
-        // Debounce region changes to avoid spamming Firestore
-        scheduleRegionChanged()
-        persistRegion()
-      }
-      .onChange(of: region.span.latitudeDelta) { _ in persistRegion() }
-      .onChange(of: region.span.longitudeDelta) { _ in persistRegion() }
-      .onChange(of: location.lastLocation) { loc in
-        // Auto-center once when we first receive a GPS fix
-        guard !didCenterOnUser, let loc = loc else { return }
-        withAnimation { region.center = loc.coordinate }
-        didCenterOnUser = true
-        // Refresh data for the new center
-        if liveUpdates { startLive() } else { loadHere() }
-      }
-      .frame(minHeight: 350)
-      .overlay(alignment: .topTrailing) {
-        Button(action: { centerOnMe() }) {
-          Image(systemName: "location.fill")
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundColor(.blue)
-            .padding(10)
-            .background(.ultraThinMaterial, in: Circle())
-        }
-        .padding(.trailing, 12)
-        .padding(.top, 12)
-        .shadow(radius: 2)
-      }
 
       HStack(spacing: 16) {
         Button(action: { loadHere() }) {
@@ -525,6 +492,93 @@ private struct DisplayItem: Identifiable {
     self.count = count
   }
 }
+
+#if swift(>=5.9)
+@available(iOS 17.0, *)
+private struct TagsMapReaderView: View {
+  @Binding var region: MKCoordinateRegion
+  @Binding var tracking: MapUserTrackingMode
+  let displayItems: [DisplayItem]
+  @Binding var selectedTag: Tag?
+  @Binding var pendingCoordinate: CLLocationCoordinate2D?
+  @Binding var showCreateSheet: Bool
+  let currentUserID: String
+  let onZoomIn: (CLLocationCoordinate2D) -> Void
+  let onUpvote: (Tag) -> Void
+  let onDownvote: (Tag) -> Void
+  let onDelete: (Tag) -> Void
+
+  @State private var lastTouchPoint: CGPoint?
+
+  var body: some View {
+    MapReader { proxy in
+      Map(
+        coordinateRegion: $region,
+        showsUserLocation: true,
+        userTrackingMode: $tracking,
+        annotationItems: displayItems
+      ) { item in
+        MapAnnotation(coordinate: item.coordinate) {
+          if let tag = item.tag {
+            Button { selectedTag = tag } label: {
+              Image(systemName: "mappin.circle.fill")
+                .font(.title2)
+                .foregroundColor(.blue)
+                .shadow(radius: 2)
+            }
+            .buttonStyle(.plain)
+          } else {
+            Button { onZoomIn(item.coordinate) } label: {
+              ZStack {
+                Circle().fill(Color.orange.opacity(0.9))
+                  .frame(width: 30, height: 30)
+                Text("\(item.count)")
+                  .font(.footnote).bold()
+                  .foregroundColor(.white)
+              }
+              .shadow(radius: 2)
+            }
+            .buttonStyle(.plain)
+          }
+        }
+      }
+      .simultaneousGesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in lastTouchPoint = value.location }
+      )
+      .simultaneousGesture(
+        LongPressGesture(minimumDuration: 0.5)
+          .onEnded { _ in
+            guard
+              let point = lastTouchPoint,
+              let coordinate = proxy.convert(point, from: .local)
+            else { return }
+            pendingCoordinate = coordinate
+            showCreateSheet = true
+          }
+      )
+      .overlay(alignment: .topLeading) {
+        if let tag = selectedTag,
+           let position = proxy.convert(
+             CLLocationCoordinate2D(latitude: tag.lat, longitude: tag.lng),
+             to: .local
+           ) {
+          TagCallout(
+            tag: tag,
+            isOwner: tag.authorId == currentUserID,
+            onUpvote: { onUpvote(tag) },
+            onDownvote: { onDownvote(tag) },
+            onDelete: { onDelete(tag) },
+            onClose: { selectedTag = nil }
+          )
+          .position(position)
+          .offset(y: -28)
+        }
+      }
+    }
+  }
+}
+#endif
 
 // MARK: - Inline callout view
 private struct TagCallout: View {
