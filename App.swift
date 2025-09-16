@@ -26,8 +26,11 @@ struct GraffNetApp: App {
 
   var body: some Scene {
     WindowGroup {
-      NavigationView { TagsMapView() }
-        .background(AppBackground())
+      ZStack {
+        AppBackground()
+        NavigationView { TagsMapView() }
+          .background(Color.clear)
+      }
     }
   }
 }
