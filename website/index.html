@@ -201,12 +201,20 @@
         <p>Bring this site to life right from your repository.</p>
       </div>
       <ol class="deploy-steps">
-        <li><strong>Commit</strong> the <code>website</code> folder to your main branch.</li>
+
         <li>
-          In your GitHub repo, open <em>Settings → Pages</em>, choose <strong>Main</strong> and
-          <code>/website</code> for the folder.
+          <strong>Commit</strong> the <code>website</code> folder (and the provided root redirect file) to your main
+          branch.
         </li>
-        <li>Save, wait for the build, and share your new graffiti hub with the crew.</li>
+        <li>
+          In your GitHub repo, open <em>Settings → Pages</em>, choose <strong>Main</strong> and <code>/(root)</code>. The
+          root <code>index.html</code> automatically routes visitors to <code>/website/</code>.
+        </li>
+        <li>
+          Save, wait for the build, and share your new graffiti hub with the crew. Prefer publishing the folder directly?
+          Switch the folder dropdown to <code>/website</code>.
+        </li>
+
       </ol>
       <p class="deploy-note">
         Want custom domains or advanced routing? Drop a <code>404.html</code> or configure a <code>CNAME</code> file in
