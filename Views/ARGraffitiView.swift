@@ -143,7 +143,7 @@ private struct ARGraffitiScene: UIViewRepresentable {
   func makeCoordinator() -> Coordinator { Coordinator(self) }
 
   func makeUIView(context: Context) -> GraffitiARView {
-    let view = GraffitiARView()
+    let view = GraffitiARView(frame: .zero)
     view.configureSession()
     view.currentColor = palette[safe: selectedColorIndex]?.uiColor ?? palette.first?.uiColor ?? .white
     view.brushSize = brushSize
@@ -260,16 +260,7 @@ private final class GraffitiARView: ARSCNView {
   }
 
   private func addPaint(at screenPoint: CGPoint) {
-    let results = hitTest(screenPoint, types: [
-      .existingPlaneUsingGeometry,
-      .existingPlaneUsingExtent,
-      .estimatedHorizontalPlane,
-      .estimatedVerticalPlane,
-      .featurePoint
-    ])
-    guard let result = results.first else { return }
-    let transform = result.worldTransform
-    let position = SCNVector3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+    guard let position = worldPosition(for: screenPoint) else { return }
 
     if let last = lastDrawPosition {
       let delta = position - last
@@ -289,6 +280,35 @@ private final class GraffitiARView: ARSCNView {
     paintContainer.addChildNode(node)
 
     lastDrawPosition = position
+  }
+
+  private func worldPosition(for screenPoint: CGPoint) -> SCNVector3? {
+    if #available(iOS 14.0, *) {
+      let targets: [ARRaycastQuery.Target] = [.existingPlaneGeometry, .estimatedPlane]
+      for target in targets {
+        if let query = raycastQuery(from: screenPoint, allowing: target, alignment: .any) {
+          let results = session.raycast(query)
+          if let result = results.first {
+            let transform = result.worldTransform
+            return SCNVector3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+          }
+        }
+      }
+    } else {
+      let results = hitTest(screenPoint, types: [
+        .existingPlaneUsingGeometry,
+        .existingPlaneUsingExtent,
+        .estimatedHorizontalPlane,
+        .estimatedVerticalPlane,
+        .featurePoint
+      ])
+      if let result = results.first {
+        let transform = result.worldTransform
+        return SCNVector3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+      }
+    }
+
+    return nil
   }
 }
 
